@@ -1,0 +1,52 @@
+# use only mac & windows ( docker v18.03+ )
+version: '3.5'
+services:
+  reverse-proxy:
+    build:
+      context: .
+      dockerfile: ./reverse-proxy/nginx/Dockerfile
+    environment:
+      - "TZ=Asia/Seoul"
+    networks:
+      web-proxy:
+        aliases:
+          - local.nestjs.jglory.io
+          - local-api.nestjs.jglory.io
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./reverse-proxy/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./reverse-proxy/sites:/etc/nginx/conf.d:ro,cached
+      - ./reverse-proxy/cert:/etc/nginx/cert:ro,cached
+
+  redis:
+    image: redis:6.2.1
+    volumes:
+      - "./redis/redis.conf:/usr/local/etc/redis.conf:rw,cached"
+    ports:
+      - "6379:6379"
+    command: bash -c "
+      mkdir -p /usr/local/var/db/redis/
+      && redis-server /usr/local/etc/redis.conf
+      "
+
+  api:
+    image: node:16
+    volumes:
+      - "../nestjs-codebase:/usr/src/app:rw"
+      - "../nestjs-codebase/package.json:/usr/src/app/package.json:ro"
+    environment:
+      - "TZ=Asia/Seoul"
+    ports:
+      - "8085:3001"
+    command: bash -c "npm install -g yarn
+      ; cd /usr/src/app
+      && yarn install
+      && yarn run start:dev
+      "
+
+networks:
+  web-proxy:
+    name: web-proxy
+    driver: bridge
